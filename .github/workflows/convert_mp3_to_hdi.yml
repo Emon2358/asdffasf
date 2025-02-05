@@ -12,10 +12,14 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg unzip zip libguestfs-tools qemu-utils mtools dosfstools
+          sudo apt-get install -y ffmpeg unzip zip qemu-utils
 
       - name: Unzip HDI File
         run: unzip hdd40.zip
+        
+      - name: Rename HDI file
+        run: |
+          mv "hdd40(boot)(win3.1 Installed).hdi" hdd40.hdi
 
       - name: Convert MP3 to WAV
         run: |
@@ -28,23 +32,34 @@ jobs:
       - name: Create Batch File
         run: echo "WPLAY output.wav" > playwav.bat
 
-      - name: Setup mtools configuration
+      - name: Setup loop device and mount
         run: |
-          echo 'drive c: file="hdd40(boot)(win3.1 Installed).hdi" mformat_only' > ~/.mtoolsrc
-          cat ~/.mtoolsrc
+          # イメージをループデバイスとしてセットアップ
+          LOOPDEV=$(sudo losetup --find --show hdd40.hdi)
+          echo "Loop device is $LOOPDEV"
+          
+          # マウントポイントを作成
+          sudo mkdir -p /mnt/pc98
+          
+          # FAT12としてマウント試行
+          sudo mount -t msdos -o fat=12 $LOOPDEV /mnt/pc98 || \
+          # FAT16としてマウント試行
+          sudo mount -t msdos -o fat=16 $LOOPDEV /mnt/pc98 || \
+          # 通常のFATとしてマウント試行
+          sudo mount -t msdos $LOOPDEV /mnt/pc98
+          
+          # ファイルをコピー
+          sudo cp WPLAY.COM /mnt/pc98/
+          sudo cp output.wav /mnt/pc98/
+          sudo cp playwav.bat /mnt/pc98/
+          
+          # アンマウントとクリーンアップ
+          sudo umount /mnt/pc98
+          sudo losetup -d $LOOPDEV
 
-      - name: Show file system info
+      - name: Rename back HDI file
         run: |
-          sudo file "hdd40(boot)(win3.1 Installed).hdi"
-          minfo c:
-
-      - name: Copy files using mtools
-        run: |
-          mdir c:
-          mcopy WPLAY.COM c:
-          mcopy output.wav c:
-          mcopy playwav.bat c:
-          mdir c:
+          mv hdd40.hdi "hdd40(boot)(win3.1 Installed).hdi"
 
       - name: Compress Final HDI
         run: zip hdd40_final.zip "hdd40(boot)(win3.1 Installed).hdi"
