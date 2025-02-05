@@ -1,65 +1,47 @@
-name: Convert MP3 to HDI
+name: Build PC-98 HDI with WAV Player
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  pull_request:
 
 jobs:
-  convert:
+  build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Install required tools
+      - name: Install Dependencies
+        run: sudo apt-get install -y mtools ffmpeg unzip zip
+
+      - name: Unzip HDI File
+        run: unzip hdd40.zip
+
+      - name: Convert MP3 to WAV
         run: |
-          sudo apt-get update
-          sudo apt-get install -y mtools
-          sudo apt-get install -y zip
-          sudo apt-get install -y dosfstools
+          ffmpeg -i input.mp3 -ac 1 -ar 22050 -f wav -bitexact output.wav
 
-      - name: Create HDI and copy MP3 files
+      - name: Download WPLAY
         run: |
-          HDI_FILE="output.img"
-          MP3_FILES=$(find . -name "*.mp3")
+          curl -L -o WPLAY.COM https://nfggames.com/forum2/index.php?action=dlattach;topic=5607.0;attach=1210
 
-          # Create an empty 10MB image file
-          dd if=/dev/zero of=$HDI_FILE bs=1M count=10
+      - name: Create Batch File
+        run: echo "WPLAY output.wav" > playwav.bat
 
-          # Create a FAT file system
-          mkfs.msdos $HDI_FILE
-
-          # Copy MP3 files to the HDI
-          mcopy -i $HDI_FILE $MP3_FILES ::/
-
-      - name: Check HDI file size
-        id: check_size
+      - name: Insert files into HDI
         run: |
-          SIZE=$(stat -c%s "output.img")
-          echo "HDI file size: $SIZE bytes"
-          echo "::set-output name=size::$SIZE"
+          cp "hdd40(boot)(win3.1 Installed).hdi" hdd40_final.hdi
+          mcopy -i hdd40_final.hdi WPLAY.COM ::/
+          mcopy -i hdd40_final.hdi output.wav ::/
+          mcopy -i hdd40_final.hdi playwav.bat ::/
 
-      - name: Create a new release
-        id: create_release
-        run: |
-          TAG="v1.0.0"
-          # Check if release already exists, skip creation if it does
-          gh release view $TAG || gh release create $TAG --title "Release $TAG" --notes "Automated release"
+      - name: Compress Final HDI
+        run: zip hdd40_final.zip hdd40_final.hdi
 
-      - name: Upload HDI or ZIP
-        run: |
-          # Fix comparison for file size condition
-          if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then
-            echo "HDI file is too large, compressing to ZIP"
-            zip output.zip output.img
-            echo "Uploading ZIP file"
-            gh release upload "v1.0.0" output.zip
-          else
-            echo "Uploading HDI file"
-            gh release upload "v1.0.0" output.img
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload HDI Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: pc98-disk-image
+          path: hdd40_final.zip
