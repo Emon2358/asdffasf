@@ -34,7 +34,9 @@ jobs:
       - name: Mount HDI and Copy Files
         run: |
           mkdir -p mnt
-          sudo guestmount -a "hdd40(boot)(win3.1 Installed).hdi" -i --rw mnt
+          # PC-98のHDIは特殊なので自動検出ではなく手動でパーティション指定
+          sudo guestmount -a "hdd40(boot)(win3.1 Installed).hdi" -m /dev/sda --rw mnt
+          sudo ls -al mnt  # 確認用
           sudo cp WPLAY.COM mnt/
           sudo cp output.wav mnt/
           sudo cp playwav.bat mnt/
