@@ -42,16 +42,22 @@ jobs:
           echo "HDI file size: $SIZE bytes"
           echo "::set-output name=size::$SIZE"
 
+      - name: Create a new release
+        id: create_release
+        run: |
+          TAG="v1.0.0"  # リリースのタグを指定
+          gh release create $TAG --title "Release $TAG" --notes "Automated release" || echo "Release already exists"
+
       - name: Upload HDI or ZIP
         run: |
           if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then  # 10MB
             echo "HDI file is too large, compressing to ZIP"
             zip output.zip output.img
             echo "Uploading ZIP file"
-            gh release upload "latest" output.zip
+            gh release upload "v1.0.0" output.zip
           else
             echo "Uploading HDI file"
-            gh release upload "latest" output.img
+            gh release upload "v1.0.0" output.img
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
