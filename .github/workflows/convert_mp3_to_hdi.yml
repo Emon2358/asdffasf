@@ -30,14 +30,21 @@ jobs:
 
       - name: Setup mtools configuration
         run: |
-          echo "drive c: file=\"hdd40(boot)(win3.1 Installed).hdi\"" > ~/.mtoolsrc
-          echo "mformat_only_c=1" >> ~/.mtoolsrc
+          echo 'drive c: file="hdd40(boot)(win3.1 Installed).hdi" mformat_only' > ~/.mtoolsrc
+          cat ~/.mtoolsrc
+
+      - name: Show file system info
+        run: |
+          sudo file "hdd40(boot)(win3.1 Installed).hdi"
+          minfo c:
 
       - name: Copy files using mtools
         run: |
+          mdir c:
           mcopy WPLAY.COM c:
           mcopy output.wav c:
           mcopy playwav.bat c:
+          mdir c:
 
       - name: Compress Final HDI
         run: zip hdd40_final.zip "hdd40(boot)(win3.1 Installed).hdi"
