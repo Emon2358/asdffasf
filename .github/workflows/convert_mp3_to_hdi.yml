@@ -12,7 +12,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg unzip zip libguestfs-tools qemu-utils parted fdisk
+          sudo apt-get install -y ffmpeg unzip zip libguestfs-tools qemu-utils mtools dosfstools
 
       - name: Unzip HDI File
         run: unzip hdd40.zip
@@ -28,39 +28,16 @@ jobs:
       - name: Create Batch File
         run: echo "WPLAY output.wav" > playwav.bat
 
-      - name: Convert HDI and prepare disk image
+      - name: Setup mtools configuration
         run: |
-          # Convert HDI to raw image
-          qemu-img convert -f raw -O raw "hdd40(boot)(win3.1 Installed).hdi" disk.img
-          
-          # Show disk information
-          sudo fdisk -l disk.img
-          
-          # Show available devices
-          sudo guestfish <<EOF
-          add disk.img
-          run
-          list-devices
-          list-partitions
-          list-filesystems
-          EOF
+          echo "drive c: file=\"hdd40(boot)(win3.1 Installed).hdi\"" > ~/.mtoolsrc
+          echo "mformat_only_c=1" >> ~/.mtoolsrc
 
-      - name: Copy Files to disk image using guestfish
+      - name: Copy files using mtools
         run: |
-          sudo guestfish <<EOF
-          add disk.img
-          run
-          mount /dev/sda /
-          upload WPLAY.COM /WPLAY.COM
-          upload output.wav /output.wav
-          upload playwav.bat /playwav.bat
-          umount /
-          exit
-          EOF
-
-      - name: Convert back to HDI
-        run: |
-          qemu-img convert -f raw -O raw disk.img "hdd40(boot)(win3.1 Installed).hdi"
+          mcopy WPLAY.COM c:
+          mcopy output.wav c:
+          mcopy playwav.bat c:
 
       - name: Compress Final HDI
         run: zip hdd40_final.zip "hdd40(boot)(win3.1 Installed).hdi"
