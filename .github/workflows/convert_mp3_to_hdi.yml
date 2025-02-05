@@ -1,38 +1,38 @@
 name: Convert MP3 to HDI
 
 on:
-  push:  # プッシュイベントでトリガー
+  push:
     branches:
-      - main  # メインブランチにプッシュされたときに実行
-  workflow_dispatch:  # 手動トリガーを設定
+      - main
+  workflow_dispatch:
 
 jobs:
   convert:
-    runs-on: ubuntu-latest  # Ubuntu環境で実行
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2  # リポジトリをチェックアウト
+        uses: actions/checkout@v2
 
       - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools  # mtoolsをインストール
-          sudo apt-get install -y zip  # ZIP圧縮ツールをインストール
-          sudo apt-get install -y dosfstools  # FATファイルシステムを作成するためのツール
+          sudo apt-get install -y mtools
+          sudo apt-get install -y zip
+          sudo apt-get install -y dosfstools
 
       - name: Create HDI and copy MP3 files
         run: |
           HDI_FILE="output.img"
           MP3_FILES=$(find . -name "*.mp3")
 
-          # 空のイメージファイルを作成
-          dd if=/dev/zero of=$HDI_FILE bs=1M count=10  # 10MBのイメージファイルを作成
+          # Create an empty 10MB image file
+          dd if=/dev/zero of=$HDI_FILE bs=1M count=10
 
-          # FATファイルシステムを作成
+          # Create a FAT file system
           mkfs.msdos $HDI_FILE
 
-          # mtoolsを使用してファイルをコピー
+          # Copy MP3 files to the HDI
           mcopy -i $HDI_FILE $MP3_FILES ::/
 
       - name: Check HDI file size
@@ -45,12 +45,14 @@ jobs:
       - name: Create a new release
         id: create_release
         run: |
-          TAG="v1.0.0"  # リリースのタグを指定
-          gh release create $TAG --title "Release $TAG" --notes "Automated release" || echo "Release already exists"
+          TAG="v1.0.0"
+          # Check if release already exists, skip creation if it does
+          gh release view $TAG || gh release create $TAG --title "Release $TAG" --notes "Automated release"
 
       - name: Upload HDI or ZIP
         run: |
-          if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then  # 10MB
+          # Fix comparison for file size condition
+          if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then
             echo "HDI file is too large, compressing to ZIP"
             zip output.zip output.img
             echo "Uploading ZIP file"
