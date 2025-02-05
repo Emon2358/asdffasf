@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4  # 最新版を使用
+        uses: actions/checkout@v4
 
       - name: Install Dependencies
-        run: sudo apt-get install -y mtools ffmpeg unzip zip
+        run: sudo apt-get install -y qemu-utils ffmpeg unzip zip
 
       - name: Unzip HDI File
         run: unzip hdd40.zip
@@ -27,18 +27,22 @@ jobs:
       - name: Create Batch File
         run: echo "WPLAY output.wav" > playwav.bat
 
-      - name: Insert files into HDI
+      - name: Mount HDI and Copy Files
         run: |
-          cp "hdd40(boot)(win3.1 Installed).hdi" hdd40_final.hdi
-          mcopy -i hdd40_final.hdi WPLAY.COM ::/
-          mcopy -i hdd40_final.hdi output.wav ::/
-          mcopy -i hdd40_final.hdi playwav.bat ::/
+          sudo modprobe nbd max_part=8
+          sudo qemu-nbd --connect=/dev/nbd0 "hdd40(boot)(win3.1 Installed).hdi"
+          sudo mount /dev/nbd0p1 /mnt
+          sudo cp WPLAY.COM /mnt/
+          sudo cp output.wav /mnt/
+          sudo cp playwav.bat /mnt/
+          sudo umount /mnt
+          sudo qemu-nbd --disconnect /dev/nbd0
 
       - name: Compress Final HDI
-        run: zip hdd40_final.zip hdd40_final.hdi
+        run: zip hdd40_final.zip "hdd40(boot)(win3.1 Installed).hdi"
 
       - name: Upload HDI Artifact
-        uses: actions/upload-artifact@v4  # v4 に更新
+        uses: actions/upload-artifact@v4
         with:
           name: pc98-disk-image
           path: hdd40_final.zip
