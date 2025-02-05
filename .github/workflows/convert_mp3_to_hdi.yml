@@ -1,0 +1,63 @@
+name: Convert MP3 to HDI
+
+on:
+  push:  # プッシュイベントでトリガー
+    branches:
+      - main  # メインブランチにプッシュされたときに実行
+  workflow_dispatch:  # 手動トリガーを設定
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest  # Ubuntu環境で実行
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2  # リポジトリをチェックアウト
+
+      - name: Install required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y hdiutil  # HDI作成ツールをインストール
+          sudo apt-get install -y ffmpeg  # MP3処理ツールをインストール
+          sudo apt-get install -y zip  # ZIP圧縮ツールをインストール
+
+      - name: Create HDI and copy MP3 files
+        run: |
+          HDI_FILE="output.hdi"
+          MP3_FILES=$(find . -name "*.mp3")
+
+          # HDIファイルを作成
+          hdiutil create -size 10m -fs "MS-DOS" -volname "MP3Volume" $HDI_FILE
+
+          # HDIファイルをマウント
+          hdiutil attach $HDI_FILE
+
+          # MP3ファイルをHDIにコピー
+          for file in $MP3_FILES; do
+            echo "Copying $file to HDI"
+            cp "$file" /Volumes/MP3Volume/
+          done
+
+          # HDIファイルをアンマウント
+          hdiutil detach /Volumes/MP3Volume
+
+      - name: Check HDI file size
+        id: check_size
+        run: |
+          SIZE=$(stat -c%s "output.hdi")
+          echo "HDI file size: $SIZE bytes"
+          echo "::set-output name=size::$SIZE"
+
+      - name: Upload HDI or ZIP
+        run: |
+          if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then  # 10MB
+            echo "HDI file is too large, compressing to ZIP"
+            zip output.zip output.hdi
+            echo "Uploading ZIP file"
+            gh release upload "latest" output.zip
+          else
+            echo "Uploading HDI file"
+            gh release upload "latest" output.hdi
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
