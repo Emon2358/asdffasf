@@ -1,17 +1,14 @@
 name: Build PC-98 HDI with WAV Player
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_dispatch:  # 手動実行
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4  # 最新版を使用
 
       - name: Install Dependencies
         run: sudo apt-get install -y mtools ffmpeg unzip zip
@@ -41,7 +38,7 @@ jobs:
         run: zip hdd40_final.zip hdd40_final.hdi
 
       - name: Upload HDI Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4  # v4 に更新
         with:
           name: pc98-disk-image
           path: hdd40_final.zip
