@@ -11,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Dependencies
-        run: sudo apt-get install -y qemu-utils ffmpeg unzip zip
+        run: sudo apt-get install -y libguestfs-tools ffmpeg unzip zip
 
       - name: Unzip HDI File
         run: unzip hdd40.zip
@@ -29,14 +29,12 @@ jobs:
 
       - name: Mount HDI and Copy Files
         run: |
-          sudo modprobe nbd max_part=8
-          sudo qemu-nbd --connect=/dev/nbd0 "hdd40(boot)(win3.1 Installed).hdi"
-          sudo mount /dev/nbd0p1 /mnt
-          sudo cp WPLAY.COM /mnt/
-          sudo cp output.wav /mnt/
-          sudo cp playwav.bat /mnt/
-          sudo umount /mnt
-          sudo qemu-nbd --disconnect /dev/nbd0
+          mkdir -p mnt
+          sudo guestmount -a "hdd40(boot)(win3.1 Installed).hdi" -m /dev/sda1 --rw mnt
+          sudo cp WPLAY.COM mnt/
+          sudo cp output.wav mnt/
+          sudo cp playwav.bat mnt/
+          sudo umount mnt
 
       - name: Compress Final HDI
         run: zip hdd40_final.zip "hdd40(boot)(win3.1 Installed).hdi"
