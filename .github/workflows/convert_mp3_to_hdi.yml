@@ -17,34 +17,28 @@ jobs:
       - name: Install required tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y hdiutil  # HDI作成ツールをインストール
-          sudo apt-get install -y ffmpeg  # MP3処理ツールをインストール
+          sudo apt-get install -y mtools  # mtoolsをインストール
           sudo apt-get install -y zip  # ZIP圧縮ツールをインストール
+          sudo apt-get install -y dosfstools  # FATファイルシステムを作成するためのツール
 
       - name: Create HDI and copy MP3 files
         run: |
-          HDI_FILE="output.hdi"
+          HDI_FILE="output.img"
           MP3_FILES=$(find . -name "*.mp3")
 
-          # HDIファイルを作成
-          hdiutil create -size 10m -fs "MS-DOS" -volname "MP3Volume" $HDI_FILE
+          # 空のイメージファイルを作成
+          dd if=/dev/zero of=$HDI_FILE bs=1M count=10  # 10MBのイメージファイルを作成
 
-          # HDIファイルをマウント
-          hdiutil attach $HDI_FILE
+          # FATファイルシステムを作成
+          mkfs.msdos $HDI_FILE
 
-          # MP3ファイルをHDIにコピー
-          for file in $MP3_FILES; do
-            echo "Copying $file to HDI"
-            cp "$file" /Volumes/MP3Volume/
-          done
-
-          # HDIファイルをアンマウント
-          hdiutil detach /Volumes/MP3Volume
+          # mtoolsを使用してファイルをコピー
+          mcopy -i $HDI_FILE $MP3_FILES ::/
 
       - name: Check HDI file size
         id: check_size
         run: |
-          SIZE=$(stat -c%s "output.hdi")
+          SIZE=$(stat -c%s "output.img")
           echo "HDI file size: $SIZE bytes"
           echo "::set-output name=size::$SIZE"
 
@@ -52,12 +46,12 @@ jobs:
         run: |
           if [ "${{ steps.check_size.outputs.size }}" -gt 10485760 ]; then  # 10MB
             echo "HDI file is too large, compressing to ZIP"
-            zip output.zip output.hdi
+            zip output.zip output.img
             echo "Uploading ZIP file"
             gh release upload "latest" output.zip
           else
             echo "Uploading HDI file"
-            gh release upload "latest" output.hdi
+            gh release upload "latest" output.img
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
