@@ -29,14 +29,16 @@ jobs:
 
       - name: Copy Files to HDI using guestfish
         run: |
-          sudo guestfish <<EOF
-          add "hdd40(boot)(win3.1 Installed).hdi" : run
+          sudo guestfish --ro <<EOF
+          add "hdd40(boot)(win3.1 Installed).hdi"
+          run
           list-filesystems
           mount /dev/sda1 /
           upload WPLAY.COM /WPLAY.COM
           upload output.wav /output.wav
           upload playwav.bat /playwav.bat
           umount /
+          exit
           EOF
 
       - name: Compress Final HDI
