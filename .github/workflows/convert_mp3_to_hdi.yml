@@ -27,10 +27,14 @@ jobs:
       - name: Create Batch File
         run: echo "WPLAY output.wav" > playwav.bat
 
+      - name: Detect Partitions
+        run: |
+          sudo virt-filesystems --long -a "hdd40(boot)(win3.1 Installed).hdi"
+
       - name: Mount HDI and Copy Files
         run: |
           mkdir -p mnt
-          sudo guestmount -a "hdd40(boot)(win3.1 Installed).hdi" -m /dev/sda1 --rw mnt
+          sudo guestmount -a "hdd40(boot)(win3.1 Installed).hdi" -i --rw mnt
           sudo cp WPLAY.COM mnt/
           sudo cp output.wav mnt/
           sudo cp playwav.bat mnt/
