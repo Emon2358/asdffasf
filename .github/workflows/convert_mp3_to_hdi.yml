@@ -1,67 +1,35 @@
-name: HDIファイル更新
+name: Extract HDI Files
 
 on:
-  workflow_dispatch:  # 手動で実行できるようにする
+  push:
+    branches:
+      - main
 
 jobs:
-  update_hdi:
+  extract_hdi:
     runs-on: ubuntu-latest
 
     steps:
-      - name: リポジトリのチェックアウト
-        uses: actions/checkout@v2
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-      - name: 必要なツールのインストール
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip zip kpartx
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'  # 使用するPythonのバージョンを指定
 
-      - name: ZIPファイルの解凍
-        run: |
-          # hdi.zipを解凍してHDIファイルを取得
-          unzip -o hdd40.zip
+    - name: Install required packages
+      run: |
+        pip install pyhdi  # HDIファイルを扱うためのライブラリをインストール
 
-      - name: HDIファイルにMP3を追加
-        run: |
-          # HDIファイルをマウントするためのディレクトリを作成
-          mkdir -p hdi_mount
-          # HDIファイルのパーティションを作成
-          sudo kpartx -av hdd40\(boot\)\(win3.1\ Installed\).hdi
-          # パーティションをマウント
-          sudo mount /dev/mapper/loop0p1 hdi_mount
-          # MP3ファイルをHDIファイルにコピー
-          cp input.mp3 hdi_mount/
-          # HDIファイルのマウントを解除
-          sudo umount hdi_mount
-          # kpartxで作成したデバイスを削除
-          sudo kpartx -d hdd40\(boot\)\(win3.1\ Installed\).hdi
+    - name: Run HDI extraction script
+      run: |
+        python script.py "./【PC98】雫.hdi"  # HDIファイルを解析するPythonスクリプトを実行
 
-      - name: 更新されたHDIファイルをZIPに圧縮
-        run: |
-          # 更新されたHDIファイルをZIP形式で圧縮
-          zip updated_hdi.zip hdd40\(boot\)\(win3.1\ Installed\).hdi
-
-      - name: 更新されたZIPファイルをリポジトリにアップロード
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const path = require('path');
-            const filePath = path.join(process.cwd(), 'updated_hdi.zip');
-            const content = fs.readFileSync(filePath);
-            const base64Content = Buffer.from(content).toString('base64');
-
-            const { data: { sha } } = await github.repos.getContent({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: 'updated_hdi.zip',
-            }).catch(() => ({ data: { sha: null } }));
-
-            await github.repos.createOrUpdateFileContents({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path: 'updated_hdi.zip',
-              message: 'Update HDI ZIP file',
-              content: base64Content,
-              sha: sha,
-            });
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add extracted_files/*.txt  # 生成されたテキストファイルを追加
+        git commit -m "Extracted files from HDI and converted to text"
+        git push
