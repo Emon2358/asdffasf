@@ -106,7 +106,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 変更があれば、一時的に保存
+          git stash
+
+          # リモートの最新状態を取得（競合が起きないように --rebase 付き）
           git pull --rebase origin main || true
+
+          # 一時保存していた変更を戻す
+          git stash pop || true
+
+          # ファイルをステージングしてコミット
           git add CONFIG.SYS GENSOU/
           git commit -m "Updated HDI files and CONFIG.SYS" || echo "No changes to commit"
+
+          # 変更をプッシュ
           git push origin main
+
