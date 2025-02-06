@@ -23,87 +23,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mtools qemu-utils
 
-      - name: Create HDI modification script
+      - name: Set Unique HDI Filename
         run: |
-          cat > modify_hdi.py << 'EOF'
-          #!/usr/bin/env python3
-          import os
-          import sys
-          import subprocess
+          TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+          echo "HDI_FILENAME=【PC98】雫_${TIMESTAMP}.hdi" >> $GITHUB_ENV
 
-          KEEP_FILES = {"CONFIG.SYS", "COMMAND.COM", "GENSOU"}
-
-          CONFIG_CONTENT = """files=20
-          buffers=10
-          device=fdxms.sys
-          dos=high
-          """
-
-          def find_alternative(files, candidates):
-              for candidate in candidates:
-                  if candidate in files:
-                      return candidate
-              return None
-
-          def modify_hdi(hdi_path, file_list_path, gen_exe_path):
-              with open(file_list_path, 'r', encoding='utf-8') as f:
-                  existing_files = set(line.strip().upper() for line in f)
-
-              alternative_files = {
-                  "EMM386.EXE": find_alternative(existing_files, {"MMDR.COM", "MSDOS.SYS"}),
-                  "FDXMS.SYS": find_alternative(existing_files, {"USKCG16.SYS", "USKCG24.SYS"}),
-                  "KERNEL.SYS": find_alternative(existing_files, {"MSDOS.SYS"})
-              }
-
-              for key, value in alternative_files.items():
-                  if value:
-                      KEEP_FILES.add(value)
-
-              # CONFIG.SYS の書き換え
-              if "CONFIG.SYS" in KEEP_FILES:
-                  with open("CONFIG.SYS", 'w', encoding='utf-8') as config:
-                      config.write(CONFIG_CONTENT)
-
-              # GENSOU フォルダの作成
-              os.makedirs("GENSOU", exist_ok=True)
-              os.rename(gen_exe_path, os.path.join("GENSOU", "gen_ts1.exe"))
-
-              # HDI をマウントして変更
-              subprocess.run(["sudo", "modprobe", "nbd", "max_part=8"])
-              subprocess.run(["sudo", "qemu-nbd", "-c", "/dev/nbd0", hdi_path])
-              os.makedirs("/mnt/hdi", exist_ok=True)
-              subprocess.run(["sudo", "mount", "/dev/nbd0p1", "/mnt/hdi"])
-
-              # ファイル削除
-              for file in existing_files:
-                  if file not in KEEP_FILES:
-                      file_path = os.path.join("/mnt/hdi", file)
-                      if os.path.exists(file_path):
-                          os.remove(file_path)
-
-              # GENSOU フォルダのコピー
-              subprocess.run(["sudo", "cp", "-r", "GENSOU", "/mnt/hdi/"])
-
-              # 書き込みを確実に反映
-              subprocess.run(["sync"])
-              subprocess.run(["sudo", "umount", "/mnt/hdi"])
-              subprocess.run(["sudo", "qemu-nbd", "-d", "/dev/nbd0"])
-
-              print("HDI modification completed.")
-
-          if __name__ == "__main__":
-              if len(sys.argv) != 4:
-                  print("Usage: modify_hdi.py <hdi_file> <file_list> <gen_ts1.exe>")
-                  sys.exit(1)
-              modify_hdi(sys.argv[1], sys.argv[2], sys.argv[3])
-          EOF
-          chmod +x modify_hdi.py
-
-      - name: Run HDI modification
+      - name: Copy HDI with New Name
         run: |
-          sudo ./modify_hdi.py "【PC98】雫.hdi" file_list.txt "gen_ts1.exe"
+          cp "【PC98】雫.hdi" "${{ env.HDI_FILENAME }}"
 
-      - name: Commit and push changes
+      - name: Modify HDI
+        run: |
+          sudo ./modify_hdi.py "${{ env.HDI_FILENAME }}" file_list.txt "gen_ts1.exe"
+
+      - name: Commit and push HDI file
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -111,21 +44,27 @@ jobs:
           # 変更があれば、一時的に保存
           git stash
 
-          # リモートの最新状態を取得（競合が起きないように --rebase 付き）
+          # リモートの最新状態を取得
           git pull --rebase origin main || true
 
           # 一時保存していた変更を戻す
           git stash pop || true
 
           # HDIのタイムスタンプを更新（変更を確実に検出させる）
-          touch "【PC98】雫.hdi"
+          touch "${{ env.HDI_FILENAME }}"
 
           # ファイルを Git に追加
-          git add CONFIG.SYS GENSOU/ "【PC98】雫.hdi"
+          git add "${{ env.HDI_FILENAME }}" CONFIG.SYS GENSOU/
 
           # 変更があればコミット
-          git commit -m "Updated HDI file and system files" || echo "No changes to commit"
+          git commit -m "Updated HDI file (${GITHUB_ENV}) and system files" || echo "No changes to commit"
 
           # 変更をプッシュ
           git push origin main
 
+      - name: Upload HDI to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "${{ env.HDI_FILENAME }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
