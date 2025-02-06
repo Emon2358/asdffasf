@@ -19,7 +19,7 @@ jobs:
       - name: ZIPファイルの解凍
         run: |
           # hdi.zipを解凍してHDIファイルを取得
-          unzip -o hdi.zip
+          unzip -o hdd40.zip
 
       - name: HDIファイルにMP3を追加
         run: |
