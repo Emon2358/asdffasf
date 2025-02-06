@@ -71,6 +71,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # リモートの変更を取り込む（fast-forward可能ならば）
+          git pull --rebase origin main || true
           git add file_list.txt
           git commit -m "Extract file list from HDI" || echo "No changes to commit"
-          git push
+          git push origin main
+
