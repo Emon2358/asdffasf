@@ -21,7 +21,7 @@ jobs:
       - name: Install HDI Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y mtools
+          sudo apt-get install -y mtools qemu-utils
 
       - name: Create HDI modification script
         run: |
@@ -84,7 +84,8 @@ jobs:
               # GENSOU フォルダのコピー
               subprocess.run(["sudo", "cp", "-r", "GENSOU", "/mnt/hdi/"])
 
-              # アンマウント
+              # 書き込みを確実に反映
+              subprocess.run(["sync"])
               subprocess.run(["sudo", "umount", "/mnt/hdi"])
               subprocess.run(["sudo", "qemu-nbd", "-d", "/dev/nbd0"])
 
@@ -116,10 +117,14 @@ jobs:
           # 一時保存していた変更を戻す
           git stash pop || true
 
-          # ファイルをステージングしてコミット
-          git add CONFIG.SYS GENSOU/
-          git commit -m "Updated HDI files and CONFIG.SYS" || echo "No changes to commit"
+          # HDIのタイムスタンプを更新（変更を確実に検出させる）
+          touch "【PC98】雫.hdi"
+
+          # ファイルを Git に追加
+          git add CONFIG.SYS GENSOU/ "【PC98】雫.hdi"
+
+          # 変更があればコミット
+          git commit -m "Updated HDI file and system files" || echo "No changes to commit"
 
           # 変更をプッシュ
           git push origin main
-
