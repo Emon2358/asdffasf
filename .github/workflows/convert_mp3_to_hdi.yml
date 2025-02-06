@@ -2,34 +2,66 @@ name: Extract HDI Files
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  extract_hdi:
+  extract:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'  # 使用するPythonのバージョンを指定
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
 
-    - name: Install required packages
-      run: |
-        pip install pyhdi  # HDIファイルを扱うためのライブラリをインストール
+      - name: Create extraction script
+        run: |
+          cat > extract_hdi.py << 'EOF'
+          #!/usr/bin/env python3
+          import os
+          import sys
 
-    - name: Run HDI extraction script
-      run: |
-        python script.py "./【PC98】雫.hdi"  # HDIファイルを解析するPythonスクリプトを実行
+          def extract_hdi(file_path, output_dir):
+              """
+              プレースホルダー実装:
+              HDIファイル内部のデータを適当な区切り（ここでは 0x00 2連続）で分割して、
+              各チャンクを個別の txt ファイルとして保存する例です。
+              実際のHDIフォーマットに合わせてここを実装してください。
+              """
+              with open(file_path, 'rb') as f:
+                  data = f.read()
+              
+              # 仮の区切り: 0x00 2連続で区切って分割
+              chunks = data.split(b'\x00\x00')
+              os.makedirs(output_dir, exist_ok=True)
+              for i, chunk in enumerate(chunks):
+                  output_file = os.path.join(output_dir, f'file_{i}.txt')
+                  # ここではバイナリのまま書き出していますが、必要に応じて文字コード変換などを行ってください。
+                  with open(output_file, 'wb') as out:
+                      out.write(chunk)
 
-    - name: Commit and push changes
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add extracted_files/*.txt  # 生成されたテキストファイルを追加
-        git commit -m "Extracted files from HDI and converted to text"
-        git push
+          if __name__ == "__main__":
+              if len(sys.argv) != 3:
+                  print("Usage: extract_hdi.py <hdi_file> <output_dir>")
+                  sys.exit(1)
+              extract_hdi(sys.argv[1], sys.argv[2])
+          EOF
+          chmod +x extract_hdi.py
+
+      - name: Run extraction
+        run: |
+          mkdir -p extracted_txt
+          # リポジトリ直下に配置されている 【PC98】雫.hdi を解析する
+          ./extract_hdi.py "【PC98】雫.hdi" extracted_txt
+
+      - name: Commit extracted files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add extracted_txt
+          git commit -m "Extracted HDI files to txt" || echo "No changes to commit"
+          git push
