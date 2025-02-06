@@ -1,4 +1,4 @@
-name: Extract HDI Files
+name: Extract File List from HDI
 
 on:
   push:
@@ -18,50 +18,59 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Create extraction script
+      - name: Create file list extraction script
         run: |
-          cat > extract_hdi.py << 'EOF'
+          cat > extract_file_list.py << 'EOF'
           #!/usr/bin/env python3
-          import os
+          import re
           import sys
 
-          def extract_hdi(file_path, output_dir):
+          def extract_file_list(hdi_path, output_file):
               """
               プレースホルダー実装:
-              HDIファイル内部のデータを適当な区切り（ここでは 0x00 2連続）で分割して、
-              各チャンクを個別の txt ファイルとして保存する例です。
-              実際のHDIフォーマットに合わせてここを実装してください。
+              HDIファイル全体のバイナリデータから、  
+              「英数字＋ピリオド＋英数字」（例: CONFIG.SYS, EMM386.EXE など）  
+              のパターンに合致する文字列を抽出し、重複を排除して一覧にします。
+
+              ※実際のHDI内部のディレクトリエントリ解析など、  
+              より正確な実装が必要な場合はここを修正してください。
               """
-              with open(file_path, 'rb') as f:
+              # HDI全体を読み込み
+              with open(hdi_path, 'rb') as f:
                   data = f.read()
               
-              # 仮の区切り: 0x00 2連続で区切って分割
-              chunks = data.split(b'\x00\x00')
-              os.makedirs(output_dir, exist_ok=True)
-              for i, chunk in enumerate(chunks):
-                  output_file = os.path.join(output_dir, f'file_{i}.txt')
-                  # ここではバイナリのまま書き出していますが、必要に応じて文字コード変換などを行ってください。
-                  with open(output_file, 'wb') as out:
-                      out.write(chunk)
+              # バイナリデータを latin1 で文字列化（エラーは無視）
+              text = data.decode('latin1', errors='ignore')
+              
+              # 正規表現でファイル名っぽいパターンを抽出（例: 1～8文字の英数字、ピリオド、1～3文字の英数字）
+              pattern = re.compile(r'\b[A-Z0-9]{1,8}\.[A-Z0-9]{1,3}\b')
+              # 大文字に変換してからマッチさせることで、誤差を減らします
+              candidates = pattern.findall(text.upper())
+              # 重複を排除してソート
+              file_names = sorted(set(candidates))
+              
+              # 結果を出力ファイルに書き出し
+              with open(output_file, 'w', encoding='utf-8') as out:
+                  for name in file_names:
+                      out.write(name + "\n")
 
           if __name__ == "__main__":
               if len(sys.argv) != 3:
-                  print("Usage: extract_hdi.py <hdi_file> <output_dir>")
+                  print("Usage: extract_file_list.py <hdi_file> <output_txt>")
                   sys.exit(1)
-              extract_hdi(sys.argv[1], sys.argv[2])
+              extract_file_list(sys.argv[1], sys.argv[2])
           EOF
-          chmod +x extract_hdi.py
+          chmod +x extract_file_list.py
 
-      - name: Run extraction
+      - name: Run file list extraction
         run: |
-          mkdir -p extracted_txt
-          # リポジトリ直下に配置されている 【PC98】雫.hdi を解析する
-          ./extract_hdi.py "【PC98】雫.hdi" extracted_txt
+          # 出力先テキストファイル名を指定
+          ./extract_file_list.py "【PC98】雫.hdi" file_list.txt
 
-      - name: Commit extracted files
+      - name: Commit file list
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add extracted_txt
-          git commit -m "Extracted HDI files to txt" || echo "No changes to commit"
+          git add file_list.txt
+          git commit -m "Extract file list from HDI" || echo "No changes to commit"
           git push
