@@ -14,23 +14,27 @@ jobs:
       - name: 必要なツールのインストール
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip zip
+          sudo apt-get install -y unzip zip kpartx
 
       - name: ZIPファイルの解凍
         run: |
           # hdi.zipを解凍してHDIファイルを取得
-          unzip -o hdd40.zip
+          unzip -o hdi.zip
 
       - name: HDIファイルにMP3を追加
         run: |
           # HDIファイルをマウントするためのディレクトリを作成
           mkdir -p hdi_mount
-          # HDIファイルをマウント
-          sudo mount -o loop hdd40\(boot\)\(win3.1\ Installed\).hdi hdi_mount
+          # HDIファイルのパーティションを作成
+          sudo kpartx -av hdd40\(boot\)\(win3.1\ Installed\).hdi
+          # パーティションをマウント
+          sudo mount /dev/mapper/loop0p1 hdi_mount
           # MP3ファイルをHDIファイルにコピー
           cp input.mp3 hdi_mount/
           # HDIファイルのマウントを解除
           sudo umount hdi_mount
+          # kpartxで作成したデバイスを削除
+          sudo kpartx -d hdd40\(boot\)\(win3.1\ Installed\).hdi
 
       - name: 更新されたHDIファイルをZIPに圧縮
         run: |
